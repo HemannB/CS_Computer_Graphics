@@ -12,9 +12,9 @@
 
 #include <iostream>
 
-void vReadKeyboard(GLFWwindow *window) {
-  if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-    glfwSetWindowShouldClose(window, true);
+void vReadKeyboard(GLFWwindow *pWindow) {
+  if (glfwGetKey(pWindow, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+    glfwSetWindowShouldClose(pWindow, true);
   }
 }
 
@@ -39,31 +39,31 @@ int main() {
     return EXIT_FAILURE;
   }
 
-  GLFWwindow *window = glfwCreateWindow(800, 800, "Triangulo", NULL, NULL);
-  if (!window) {
+  GLFWwindow *pWindow = glfwCreateWindow(800, 800, "Triangulo", NULL, NULL);
+  if (!pWindow) {
     std::cerr << "Falha ao criar a janela GLFW" << std::endl;
     glfwTerminate();
     return EXIT_FAILURE;
   }
-  glfwSetWindowPos(window, 0, 0);
-  glfwMakeContextCurrent(window);
+  glfwSetWindowPos(pWindow, 0, 0);
+  glfwMakeContextCurrent(pWindow);
 
   if (glewInit() != GLEW_OK) {
     std::cerr << "Falha ao inicializar GLEW" << std::endl;
     return EXIT_FAILURE;
   }
 
-  while (!glfwWindowShouldClose(window)) {
+  while (!glfwWindowShouldClose(pWindow)) {
     glClear(GL_COLOR_BUFFER_BIT);
 
-    vReadKeyboard(window);
+    vReadKeyboard(pWindow);
     vDraw();
 
-    glfwSwapBuffers(window);
+    glfwSwapBuffers(pWindow);
     glfwPollEvents();
   }
 
-  glfwDestroyWindow(window);
+  glfwDestroyWindow(pWindow);
   glfwTerminate();
   return EXIT_SUCCESS;
 }
