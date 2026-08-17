@@ -7,13 +7,9 @@
  * *********************************************************************
  */
 
-// Bibliotecas gráficas: carregamento do OpenGL, projeções e gerenciamento da
-// janela e de seus eventos.
 #include <GL/glew.h>
 #include <GL/glu.h>
 #include <GLFW/glfw3.h>
-
-// Biblioteca padrão usada para mensagens no terminal.
 #include <iostream>
 
 // -----------------------------------------------------------------------------
@@ -59,7 +55,7 @@ bool rotatingU = false;
 bool rotatingD = false;
 bool rotatingL = false;
 bool rotatingR = false;
-bool rotatingCounterClockwise = false;
+bool rotatingAntiClockwise = false;
 bool rotatingClockwise = false;
 const GLfloat kRotateAngleLimit = 360;
 const GLfloat kDefaultRotateAngle = 0;
@@ -69,14 +65,22 @@ GLfloat rotate_angleY = kDefaultRotateAngle;
 GLfloat rotate_angleZ = kDefaultRotateAngle;
 
 // -----------------------------------------------------------------------------
-// Estado e limites da escala aplicada no eixo X
+// Estado e limites da escala aplicada nos eixos X, Y e Z
 // -----------------------------------------------------------------------------
 
-bool scaling = false;
-const GLfloat kScaleLimit = 10;
-const GLfloat kDefaultScale = 1;
+bool scalingL = false;
+bool scalingR = false;
+bool scalingU = false;
+bool scalingD = false;
+bool scalingNear = false;
+bool scalingFar = false;
+const GLfloat kScaleMin = 0.1f;
+const GLfloat kScaleMax = 10.0f;
+const GLfloat kDefaultScale = 1.0f;
 GLfloat scale_increment = 0.1f;
-GLfloat scale = kDefaultScale;
+GLfloat scaleX = kDefaultScale;
+GLfloat scaleY = kDefaultScale;
+GLfloat scaleZ = kDefaultScale;
 
 // -----------------------------------------------------------------------------
 // Leitura do teclado
@@ -88,7 +92,8 @@ GLfloat scale = kDefaultScale;
 // T + Page Up/Down Translada no eixo Z.
 // R + setas        Rotaciona nos eixos X e Y.
 // R + Page Up/Down Rotaciona no eixo Z.
-// E                Aplica escala no eixo X.
+// E + setas        Aplica escala nos eixos X e Y.
+// E + Page Up/Down Aplica escala no eixo Z.
 // -----------------------------------------------------------------------------
 
 void keyboard_read(GLFWwindow *window) {
@@ -104,7 +109,9 @@ void keyboard_read(GLFWwindow *window) {
     rotate_angle = kDefaultRotateAngle;
     rotate_angleY = kDefaultRotateAngle;
     rotate_angleZ = kDefaultRotateAngle;
-    scale = kDefaultScale;
+    scaleX = kDefaultScale;
+    scaleY = kDefaultScale;
+    scaleZ = kDefaultScale;
   }
 
   // Seleção do tipo de projeção.
@@ -152,7 +159,7 @@ void keyboard_read(GLFWwindow *window) {
                             glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS);
   bool rotateRightPressed = (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS &&
                              glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS);
-  bool rotateCounterClockwisePressed =
+  bool rotateAntiClockwisePressed =
       (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS &&
        glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS);
   bool rotateClockwisePressed =
@@ -163,60 +170,81 @@ void keyboard_read(GLFWwindow *window) {
   rotatingD = rotateDownPressed;
   rotatingL = rotateLeftPressed;
   rotatingR = rotateRightPressed;
-  rotatingCounterClockwise = rotateCounterClockwisePressed;
+  rotatingAntiClockwise = rotateAntiClockwisePressed;
   rotatingClockwise = rotateClockwisePressed;
 
-  // A escala permanece ativa enquanto a tecla E estiver pressionada.
-  if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
-    scaling = true;
-  }
-  if (glfwGetKey(window, GLFW_KEY_E) == GLFW_RELEASE) {
-    scaling = false;
-  }
+  // Combinações para escala nos três eixos.
+
+  bool scaleLeftPressed = (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS &&
+                           glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS);
+  bool scaleRightPressed = (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS &&
+                            glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS);
+  bool scaleUpPressed = (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS &&
+                         glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS);
+  bool scaleDownPressed = (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS &&
+                           glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS);
+  bool scaleNearPressed =
+      (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS &&
+       glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS);
+  bool scaleFarPressed = (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS &&
+                          glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS);
+
+  scalingL = scaleLeftPressed;
+  scalingR = scaleRightPressed;
+  scalingU = scaleUpPressed;
+  scalingD = scaleDownPressed;
+  scalingNear = scaleNearPressed;
+  scalingFar = scaleFarPressed;
 }
 
 // -----------------------------------------------------------------------------
-// Projeção para uma janela fixa e quadrada
+// Ajuste da janela e configuração das projeções
 // -----------------------------------------------------------------------------
 
-void configure_projection(GLFWwindow *window) {
+void resize_window(GLFWwindow *window) {
+  int window_width, window_height;
+  glfwGetFramebufferSize(window, &window_width, &window_height);
+  glViewport(0, 0, window_width, window_height);
+
+  GLdouble aspect_ratio = (GLdouble)window_width / window_height;
+
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
 
-  // Projeção ortográfica.
   if (orthographic_view) {
     glfwSetWindowTitle(window, "Quadrado ortogonal");
-    glOrtho(-kOrthographicLimitX, kOrthographicLimitX,
-            -kOrthographicLimitY, kOrthographicLimitY,
-            -kOrthographicLimitZ, kOrthographicLimitZ);
+    GLdouble left = -kOrthographicLimitX;
+    GLdouble right = kOrthographicLimitX;
+    GLdouble bottom = -kOrthographicLimitY;
+    GLdouble top = kOrthographicLimitY;
+    GLdouble near = -kOrthographicLimitZ;
+    GLdouble far = kOrthographicLimitZ;
+    if (window_width > window_height) {
+      glOrtho((left * aspect_ratio), (right * aspect_ratio), bottom, top, near,
+              far);
+    } else {
+      glOrtho(left, right, (bottom / aspect_ratio), (top / aspect_ratio), near,
+              far);
+    }
   }
 
-  // A janela é quadrada, portanto sua proporção é fixa em 1.0.
   if (perspective_view) {
     glfwSetWindowTitle(window, "Quadrado em perspectiva");
-    gluPerspective(kPerspectiveFieldOfViewAngle, 1.0, kPerspectiveNearZ,
-                   kPerspectiveFarZ);
+    GLdouble field_of_view = kPerspectiveFieldOfViewAngle;
+    GLdouble near = kPerspectiveNearZ;
+    GLdouble far = kPerspectiveFarZ;
+    gluPerspective(field_of_view, aspect_ratio, near, far);
   }
 }
-
-// -----------------------------------------------------------------------------
-// Transformações e desenho
-//
-// Prepara a matriz de modelo, atualiza as transformações conforme as teclas
-// pressionadas e desenha o quadrado.
-// -----------------------------------------------------------------------------
 
 void draw() {
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
 
-  // Na perspectiva, desloca o objeto para a região visível da câmera.
   GLfloat perspectiveTranslateZ =
       perspective_view ? -kPerspectiveTranslateZ : 0.0f;
-  glTranslatef(translate, translateY,
-               perspectiveTranslateZ + translateZ);
+  glTranslatef(translate, translateY, perspectiveTranslateZ + translateZ);
 
-  // Translação no eixo X, limitada ao intervalo configurado.
   if (translatingL) {
     std::cout << "Translating Left: " << translate << std::endl;
     if (translate > -kTranslateLimit) {
@@ -306,7 +334,7 @@ void draw() {
   // Rotação no eixo Z. Page Up gira no sentido anti-horário e Page Down no
   // sentido horário.
   glRotatef(rotate_angleZ, 0, 0, 1);
-  if (rotatingCounterClockwise) {
+  if (rotatingAntiClockwise) {
     rotate_angleZ += rotate_angle_increment;
     if (rotate_angleZ >= kRotateAngleLimit) {
       rotate_angleZ = kDefaultRotateAngle;
@@ -319,20 +347,53 @@ void draw() {
     }
   }
 
-  // Escala no eixo X, alternando a direção ao alcançar cada limite.
-  glScalef(scale, 1, 1);
-  if (scaling) {
-    scale += scale_increment;
-    if (scale >= kScaleLimit) {
-      scale = kScaleLimit;
-      scale_increment *= -1;
-    } else if (scale <= -kScaleLimit) {
-      scale = -kScaleLimit;
-      scale_increment *= -1;
+  // Escala nos eixos X, Y e Z, respeitando os limites mínimo e máximo.
+  glScalef(scaleX, scaleY, scaleZ);
+  if (scalingL) {
+    scaleX -= scale_increment;
+
+    if (scaleX < kScaleMin) {
+      scaleX = kScaleMin;
     }
   }
 
-  // Geometria e cores dos quatro vértices do quadrado.
+  if (scalingR) {
+    scaleX += scale_increment;
+
+    if (scaleX > kScaleMax) {
+      scaleX = kScaleMax;
+    }
+  }
+
+  if (scalingU) {
+    scaleY += scale_increment;
+
+    if (scaleY > kScaleMax) {
+      scaleY = kScaleMax;
+    }
+  }
+  if (scalingD) {
+    scaleY -= scale_increment;
+
+    if (scaleY < kScaleMin) {
+      scaleY = kScaleMin;
+    }
+  }
+  if (scalingNear) {
+    scaleZ += scale_increment;
+
+    if (scaleZ > kScaleMax) {
+      scaleZ = kScaleMax;
+    }
+  }
+  if (scalingFar) {
+    scaleZ -= scale_increment;
+
+    if (scaleZ < kScaleMin) {
+      scaleZ = kScaleMin;
+    }
+  }
+
   glBegin(GL_QUADS);
   {
     glColor3ub(255, 0, 0);
@@ -358,7 +419,6 @@ int main() {
     return EXIT_FAILURE;
   }
 
-  // Cria uma janela quadrada, pequena e com tamanho fixo.
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
   GLFWwindow *window =
       glfwCreateWindow(kWindowWidth, kWindowHeight, "", NULL, NULL);
@@ -376,23 +436,46 @@ int main() {
     return EXIT_FAILURE;
   }
 
-  // Faz o OpenGL respeitar a profundidade dos objetos desenhados.
   glEnable(GL_DEPTH_TEST);
 
-  // Loop principal: limpa, atualiza o estado, desenha e processa eventos.
   while (!glfwWindowShouldClose(window)) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     keyboard_read(window);
-    configure_projection(window);
+    resize_window(window);
     draw();
 
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
 
-  // Libera a janela e encerra a GLFW antes de finalizar o programa.
   glfwDestroyWindow(window);
   glfwTerminate();
   return EXIT_SUCCESS;
 }
+/*
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⡤⠤⣄⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⡾⠉⠀⠀⠀⠀⠈⠙⠲⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⠋⠀⠀⠀⣀⠀⠀⣠⠀⢀⠘⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⠛⠁⠀⠀⠀⠙⣳⣶⣿⣫⣤⣼⣖⡏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣿⠏⠀⠢⢄⡴⣣⣾⠋⠻⣿⡾⣿⣿⣿⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢿⣴⡏⡴⠋⣴⡿⠻⠀⠀⢠⣴⡯⣹⢸⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⡤⠶⠒⠒⠲⠦⣄⣀⣀⣀⡽⠻⣧⣸⡿⣇⠀⢰⣾⣯⡿⢨⠏⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠾⠃⠀⠀⠀⠀⠀⠀⠀⠑⠦⣌⠛⠦⣆⠋⠁⠘⢷⣄⠺⢿⣷⣻⣾⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⢀⡴⠞⠋⠉⣩⣉⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠛⣦⡈⠓⢿⡮⣴⣼⢿⣿⢻⣄⠙⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⣀⡤⠴⠤⣼⢛⡁⣠⣴⠟⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢻⣆⠀⠙⢦⡀⢪⡉⠉⠛⣿⠲⢤⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⢠⡞⠉⠀⠀⠀⠀⠀⠹⣟⡁⠀⠀⠀⠀⠀⢀⡴⣲⣲⣦⠀⠀⠀⠀⠀⠀⠀⠀⢹⡆⠀⠀⣿⣶⣿⣶⣲⣃⠀⢸⠙⣦⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⡴⠟⠀⠀⠀⠀⠀⣠⣞⣻⣫⠷⡶⡲⡖⢲⣶⣟⣰⣿⡋⠙⣷⣦⣄⠀⢠⠴⠲⣄⠈⡇⢸⣷⣌⡻⣿⣿⡿⢁⣼⡎⡇⠰⣌⠹⣆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⢷⣿⣶⠦⠤⠤⢤⡿⠓⡆⡿⡇⢹⡀⢳⠀⣇⢻⡿⢮⢷⢀⡀⠈⠉⠉⠉⠀⢀⠛⠦⣿⢸⣿⣿⣿⣿⣿⣿⣿⣿⣷⡇⠃⠘⣧⠹⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠈⠻⣷⣀⠀⣈⣿⣞⣡⡷⢷⣿⣾⣿⣶⣏⣾⣹⢈⣿⣴⣉⣉⠒⠒⠒⠉⠉⠙⠲⢤⣉⠛⠻⠯⣿⣿⣯⡙⢿⡏⣿⠀⠀⢸⠀⢹⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠉⠙⠛⠛⠛⠛⠛⠛⠛⢫⣟⣿⣿⠿⢥⣾⠏⢷⣲⣢⣒⣛⢭⡀⠒⠒⠢⠤⠬⢭⣒⡦⣄⡈⠉⠉⠓⠓⠿⠤⣤⣏⣐⣾⠁⠀⠀⠀⠀⠀⢀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠉⠀⠀⠀⣏⣀⣴⠒⠚⡟⠽⡗⠊⢳⠒⠛⠉⠉⠉⢉⣉⣉⣉⠉⠙⠒⠒⠀⠤⠤⠤⣌⣉⡉⠛⠒⠒⠦⠴⢿⡋⣿⢹⣲⣤⡀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠹⣦⡀⠀⠘⣦⣷⣄⡴⠚⢛⣿⣿⡋⠉⠉⠉⣩⠏⠉⠹⣿⠛⢲⣶⠶⠤⠤⢤⣈⣉⣑⣒⡶⠞⣟⣛⣲⣇⣇⣟⠒⠒⠦⢤⣀⡀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢿⣴⣾⠟⣻⠦⣤⣴⣿⡟⠋⠉⠉⠉⠙⢹⡗⠒⠒⣿⡇⣸⢧⡀⠀⢀⡼⠀⠀⠈⡿⠀⠘⢻⡿⢿⣿⠟⠥⠭⠭⣽⣒⣲⣭⠷
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⣿⣱⣾⠿⠛⣡⠖⢻⣧⣀⣀⣀⣀⣀⣸⠇⠀⢀⣿⣷⠟⣷⡽⠷⠿⣅⡤⡖⣿⣡⣤⣤⣼⢀⣀⡼⠁⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢿⠃⣀⡀⡇⠀⠈⢿⠉⠀⠀⠈⠉⢹⡟⠒⣞⣽⠟⢰⡏⠀⠀⢀⡟⡉⢀⣽⣷⣧⣼⡿⠋⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⢣⣇⣻⣿⣀⣀⣸⣆⣀⣀⣀⡀⣸⠃⠀⣸⣿⣀⡲⣷⣄⣀⣀⣷⣾⣿⣿⣿⣿⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠰⣿⣿⠿⠟⠛⠛⠛⠛⠛⡓⠛⠿⠿⠿⣽⣖⣷⣧⠙⢿⡛⠯⠍⠭⠵⠛⣛⡾⠛⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣿⣿⣶⣾⣿⣿⣶⣶⣶⣤⣄⣀⡀⠀⠀⠂⣹⡏⠀⠈⠻⠷⠤⠤⠴⠞⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠰⠟⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠚⠛⠛⠛⠛⠛⠿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+Hemann*/
