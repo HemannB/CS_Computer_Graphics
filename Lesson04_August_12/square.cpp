@@ -82,19 +82,10 @@ GLfloat scaleX = kDefaultScale;
 GLfloat scaleY = kDefaultScale;
 GLfloat scaleZ = kDefaultScale;
 
-// -----------------------------------------------------------------------------
-// Leitura do teclado
-//
-// ESC              Fecha a janela.
-// ESPAÇO           Restaura todas as transformações.
-// O / P            Alterna entre projeção ortográfica e perspectiva.
-// T + setas        Translada nos eixos X e Y.
-// T + Page Up/Down Translada no eixo Z.
-// R + setas        Rotaciona nos eixos X e Y.
-// R + Page Up/Down Rotaciona no eixo Z.
-// E + setas        Aplica escala nos eixos X e Y.
-// E + Page Up/Down Aplica escala no eixo Z.
-// -----------------------------------------------------------------------------
+bool combinationKeys(GLFWwindow *window, int modifierKey, int mainKey) {
+  return (glfwGetKey(window, modifierKey) == GLFW_PRESS &&
+          glfwGetKey(window, mainKey) == GLFW_PRESS);
+}
 
 void keyboard_read(GLFWwindow *window) {
   // Controles gerais da aplicação.
@@ -126,81 +117,32 @@ void keyboard_read(GLFWwindow *window) {
   }
 
   // Combinações para translação nos três eixos.
-  bool translateLeftPressed = (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS &&
-                               glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS);
-  bool translateRightPressed =
-      (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS &&
-       glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS);
-  bool translateUpPressed = (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS &&
-                             glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS);
-  bool translateDownPressed = (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS &&
-                               glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS);
-
-  bool translateNearPressed =
-      (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS &&
-       glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS);
-  bool translateFarPressed =
-      (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS &&
-       glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS);
-
-  translatingL = translateLeftPressed;
-  translatingR = translateRightPressed;
-  translatingU = translateUpPressed;
-  translatingD = translateDownPressed;
-  translatingNear = translateNearPressed;
-  translatingFar = translateFarPressed;
+  translatingL = (combinationKeys(window, GLFW_KEY_T, GLFW_KEY_LEFT));
+  translatingR = (combinationKeys(window, GLFW_KEY_T, GLFW_KEY_RIGHT));
+  translatingU = (combinationKeys(window, GLFW_KEY_T, GLFW_KEY_UP));
+  translatingD = (combinationKeys(window, GLFW_KEY_T, GLFW_KEY_DOWN));
+  translatingNear = (combinationKeys(window, GLFW_KEY_T, GLFW_KEY_PAGE_DOWN));
+  translatingFar = (combinationKeys(window, GLFW_KEY_T, GLFW_KEY_PAGE_UP));
 
   // Combinações para rotação nos três eixos.
-  bool rotateUpPressed = (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS &&
-                          glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS);
-  bool rotateDownPressed = (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS &&
-                            glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS);
-  bool rotateLeftPressed = (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS &&
-                            glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS);
-  bool rotateRightPressed = (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS &&
-                             glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS);
-  bool rotateAntiClockwisePressed =
-      (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS &&
-       glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS);
-  bool rotateClockwisePressed =
-      (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS &&
-       glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS);
-
-  rotatingU = rotateUpPressed;
-  rotatingD = rotateDownPressed;
-  rotatingL = rotateLeftPressed;
-  rotatingR = rotateRightPressed;
-  rotatingAntiClockwise = rotateAntiClockwisePressed;
-  rotatingClockwise = rotateClockwisePressed;
+  rotatingU = (combinationKeys(window, GLFW_KEY_R, GLFW_KEY_UP));
+  rotatingD = (combinationKeys(window, GLFW_KEY_R, GLFW_KEY_DOWN));
+  rotatingL = (combinationKeys(window, GLFW_KEY_R, GLFW_KEY_LEFT));
+  rotatingR = (combinationKeys(window, GLFW_KEY_R, GLFW_KEY_RIGHT));
+  rotatingAntiClockwise =
+      (combinationKeys(window, GLFW_KEY_R, GLFW_KEY_PAGE_UP));
+  rotatingClockwise = (combinationKeys(window, GLFW_KEY_R, GLFW_KEY_PAGE_DOWN));
 
   // Combinações para escala nos três eixos.
-
-  bool scaleLeftPressed = (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS &&
-                           glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS);
-  bool scaleRightPressed = (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS &&
-                            glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS);
-  bool scaleUpPressed = (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS &&
-                         glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS);
-  bool scaleDownPressed = (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS &&
-                           glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS);
-  bool scaleNearPressed =
-      (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS &&
-       glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS);
-  bool scaleFarPressed = (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS &&
-                          glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS);
-
-  scalingL = scaleLeftPressed;
-  scalingR = scaleRightPressed;
-  scalingU = scaleUpPressed;
-  scalingD = scaleDownPressed;
-  scalingNear = scaleNearPressed;
-  scalingFar = scaleFarPressed;
+  scalingL = (combinationKeys(window, GLFW_KEY_E, GLFW_KEY_LEFT));
+  scalingR = (combinationKeys(window, GLFW_KEY_E, GLFW_KEY_RIGHT));
+  scalingU = (combinationKeys(window, GLFW_KEY_E, GLFW_KEY_UP));
+  scalingD = (combinationKeys(window, GLFW_KEY_E, GLFW_KEY_DOWN));
+  scalingNear = (combinationKeys(window, GLFW_KEY_E, GLFW_KEY_PAGE_DOWN));
+  scalingFar = (combinationKeys(window, GLFW_KEY_E, GLFW_KEY_PAGE_UP));
 }
 
-// -----------------------------------------------------------------------------
 // Ajuste da janela e configuração das projeções
-// -----------------------------------------------------------------------------
-
 void resize_window(GLFWwindow *window) {
   int window_width, window_height;
   glfwGetFramebufferSize(window, &window_width, &window_height);
