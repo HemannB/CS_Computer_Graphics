@@ -9,8 +9,6 @@
 #include <GL/glew.h>
 #include <GL/glu.h>
 #include <GLFW/glfw3.h>
-#include <algorithm>
-#include <cmath>
 #include <iostream>
 #include <sstream>
 
@@ -27,6 +25,8 @@ bool orthographic_view = true;
 const GLfloat kOrthographicLimitX = 6;
 const GLfloat kOrthographicLimitY = 6;
 const GLfloat kOrthographicLimitZ = 20;
+
+bool reset_pressed = false;
 
 bool translating = false;
 bool translatingL = false;
@@ -109,6 +109,7 @@ void keyboard_read(GLFWwindow *window) {
   }
 
   if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+    reset_pressed = true;
     translate = kDefaultTranslate;
     translateY = kDefaultTranslate;
     translateZ = kDefaultTranslate;
@@ -147,7 +148,7 @@ void resize_window(GLFWwindow *window) {
   glfwGetFramebufferSize(window, &window_width, &window_height);
   glViewport(0, 0, window_width, window_height);
 }
-
+/*! @brief Atualiza o texto do HUD dado o estado atual... */
 void update_hud() {
   hud_text.str("");
 
@@ -160,8 +161,9 @@ void update_hud() {
   } else if (scaling) {
     hud_text << "Escalando (" << scaleX << ", " << scaleY << ", " << scaleZ
              << ")";
-  } else {
-    hud_text << "T: mover  R: girar  E: escalar";
+  } else if (reset_pressed) {
+    hud_text << "Redefinido!";
+    reset_pressed = false;
   }
 }
 
@@ -335,14 +337,21 @@ int direction(bool positive, bool negative) {
 
 void updateLimited(GLfloat &value, bool increase, bool decrease,
                    GLfloat increment, GLfloat minimum, GLfloat maximum) {
-  value = std::clamp(value + direction(increase, decrease) * increment, minimum,
-                     maximum);
+  value += direction(increase, decrease) * increment;
+
+  if (value > maximum) {
+    value = maximum;
+  } else if (value < minimum) {
+    value = minimum;
+  }
 }
 
 void updateRotation(GLfloat &angle, bool positive, bool negative) {
-  angle =
-      std::fmod(angle + direction(positive, negative) * rotate_angle_increment,
-                kRotateAngleLimit);
+  angle += direction(positive, negative) * rotate_angle_increment;
+
+  if (angle >= kRotateAngleLimit || angle <= -kRotateAngleLimit) {
+    angle = 0;
+  }
 }
 
 void updateTransformations() {
