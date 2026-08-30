@@ -21,20 +21,9 @@ const GLfloat kPerspectiveNearZ = 0.1f;
 const GLfloat kPerspectiveFarZ = 100;
 const GLfloat kPerspectiveTranslateZ = 10;
 
-bool orthographic_view = true;
-const GLfloat kOrthographicLimitX = 6;
-const GLfloat kOrthographicLimitY = 6;
-const GLfloat kOrthographicLimitZ = 20;
-
 bool reset_pressed = false;
 
 bool translating = false;
-bool translatingL = false;
-bool translatingR = false;
-bool translatingU = false;
-bool translatingD = false;
-bool translatingNear = false;
-bool translatingFar = false;
 const GLfloat kTranslateLimit = 3;
 const GLfloat kDefaultTranslate = 0;
 GLfloat translate_increment = 0.1f;
@@ -43,12 +32,6 @@ GLfloat translateY = kDefaultTranslate;
 GLfloat translateZ = kDefaultTranslate;
 
 bool rotating = false;
-bool rotatingU = false;
-bool rotatingD = false;
-bool rotatingL = false;
-bool rotatingR = false;
-bool rotatingAntiClockwise = false;
-bool rotatingClockwise = false;
 const GLfloat kRotateAngleLimit = 360;
 const GLfloat kDefaultRotateAngle = 0;
 GLfloat rotate_angle_increment = 1.0f;
@@ -57,12 +40,6 @@ GLfloat rotate_angleY = kDefaultRotateAngle;
 GLfloat rotate_angleZ = kDefaultRotateAngle;
 
 bool scaling = false;
-bool scalingL = false;
-bool scalingR = false;
-bool scalingU = false;
-bool scalingD = false;
-bool scalingNear = false;
-bool scalingFar = false;
 const GLfloat kScaleMin = 0.1f;
 const GLfloat kScaleMax = 5.0f;
 const GLfloat kDefaultScale = 1.0f;
@@ -75,34 +52,10 @@ const GLfloat kHudHeight = 300;
 const GLfloat kHudWidth = 300;
 std::ostringstream hud_text;
 
-/*! @brief Função para verificar se uma combinação de teclas está sendo
- * pressionada.
- * @param window Ponteiro para a janela GLFW.
- * @param modifierKey Tecla modificadora (ex: GLFW_KEY_T, GLFW_KEY_R,
- * GLFW_KEY_E).
- * @param mainKey Tecla principal (ex: GLFW_KEY_LEFT, GLFW_KEY_RIGHT,
- * GLFW_KEY_UP, GLFW_KEY_DOWN, GLFW_KEY_PAGE_UP, GLFW_KEY_PAGE_DOWN).
- */
-bool combinationKeys(GLFWwindow *window, int modifierKey, int mainKey);
-
-/*! @brief Converte duas direções opostas em um valor entre -1 e 1. */
-int direction(bool positive, bool negative);
-
-/*! @brief Atualiza um valor, mantendo-o dentro dos limites informados. */
-void updateLimited(GLfloat &value, bool increase, bool decrease,
-                   GLfloat increment, GLfloat minimum, GLfloat maximum);
-
-/*! @brief Atualiza um ângulo e o normaliza ao completar uma volta. */
-void updateRotation(GLfloat &angle, bool positive, bool negative);
-
-/*! @brief Atualiza os valores de translação, rotação e escala. */
-void updateTransformations();
-
 void keyboard_read(GLFWwindow *window) {
-  // Só pra mostrar no HUD qual modificação está sendo feita...
-  translating = combinationKeys(window, GLFW_KEY_T, GLFW_KEY_T);
-  rotating = combinationKeys(window, GLFW_KEY_R, GLFW_KEY_R);
-  scaling = combinationKeys(window, GLFW_KEY_E, GLFW_KEY_E);
+  translating = glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS;
+  rotating = glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS;
+  scaling = glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS;
 
   if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
     glfwSetWindowShouldClose(window, true);
@@ -121,26 +74,113 @@ void keyboard_read(GLFWwindow *window) {
     scaleZ = kDefaultScale;
   }
 
-  translatingL = combinationKeys(window, GLFW_KEY_T, GLFW_KEY_LEFT);
-  translatingR = combinationKeys(window, GLFW_KEY_T, GLFW_KEY_RIGHT);
-  translatingU = combinationKeys(window, GLFW_KEY_T, GLFW_KEY_UP);
-  translatingD = combinationKeys(window, GLFW_KEY_T, GLFW_KEY_DOWN);
-  translatingNear = combinationKeys(window, GLFW_KEY_T, GLFW_KEY_PAGE_DOWN);
-  translatingFar = combinationKeys(window, GLFW_KEY_T, GLFW_KEY_PAGE_UP);
+  if (translating) {
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+      translate -= translate_increment;
+    }
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+      translate += translate_increment;
+    }
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+      translateY += translate_increment;
+    }
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+      translateY -= translate_increment;
+    }
+    if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS) {
+      translateZ += translate_increment;
+    }
+    if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS) {
+      translateZ -= translate_increment;
+    }
+  }
 
-  rotatingU = combinationKeys(window, GLFW_KEY_R, GLFW_KEY_UP);
-  rotatingD = combinationKeys(window, GLFW_KEY_R, GLFW_KEY_DOWN);
-  rotatingL = combinationKeys(window, GLFW_KEY_R, GLFW_KEY_LEFT);
-  rotatingR = combinationKeys(window, GLFW_KEY_R, GLFW_KEY_RIGHT);
-  rotatingAntiClockwise = combinationKeys(window, GLFW_KEY_R, GLFW_KEY_PAGE_UP);
-  rotatingClockwise = combinationKeys(window, GLFW_KEY_R, GLFW_KEY_PAGE_DOWN);
+  if (translate > kTranslateLimit) {
+    translate = kTranslateLimit;
+  } else if (translate < -kTranslateLimit) {
+    translate = -kTranslateLimit;
+  }
+  if (translateY > kTranslateLimit) {
+    translateY = kTranslateLimit;
+  } else if (translateY < -kTranslateLimit) {
+    translateY = -kTranslateLimit;
+  }
+  if (translateZ > kTranslateLimit) {
+    translateZ = kTranslateLimit;
+  } else if (translateZ < -kTranslateLimit) {
+    translateZ = -kTranslateLimit;
+  }
 
-  scalingL = combinationKeys(window, GLFW_KEY_E, GLFW_KEY_LEFT);
-  scalingR = combinationKeys(window, GLFW_KEY_E, GLFW_KEY_RIGHT);
-  scalingU = combinationKeys(window, GLFW_KEY_E, GLFW_KEY_UP);
-  scalingD = combinationKeys(window, GLFW_KEY_E, GLFW_KEY_DOWN);
-  scalingNear = combinationKeys(window, GLFW_KEY_E, GLFW_KEY_PAGE_DOWN);
-  scalingFar = combinationKeys(window, GLFW_KEY_E, GLFW_KEY_PAGE_UP);
+  if (rotating) {
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+      rotate_angle += rotate_angle_increment;
+    }
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+      rotate_angle -= rotate_angle_increment;
+    }
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+      rotate_angleY += rotate_angle_increment;
+    }
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+      rotate_angleY -= rotate_angle_increment;
+    }
+    if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS) {
+      rotate_angleZ += rotate_angle_increment;
+    }
+    if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS) {
+      rotate_angleZ -= rotate_angle_increment;
+    }
+  }
+
+  if (rotate_angle >= kRotateAngleLimit ||
+      rotate_angle <= -kRotateAngleLimit) {
+    rotate_angle = kDefaultRotateAngle;
+  }
+  if (rotate_angleY >= kRotateAngleLimit ||
+      rotate_angleY <= -kRotateAngleLimit) {
+    rotate_angleY = kDefaultRotateAngle;
+  }
+  if (rotate_angleZ >= kRotateAngleLimit ||
+      rotate_angleZ <= -kRotateAngleLimit) {
+    rotate_angleZ = kDefaultRotateAngle;
+  }
+
+  if (scaling) {
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+      scaleX -= scale_increment;
+    }
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+      scaleX += scale_increment;
+    }
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+      scaleY += scale_increment;
+    }
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+      scaleY -= scale_increment;
+    }
+    if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS) {
+      scaleZ += scale_increment;
+    }
+    if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS) {
+      scaleZ -= scale_increment;
+    }
+  }
+
+  if (scaleX > kScaleMax) {
+    scaleX = kScaleMax;
+  } else if (scaleX < kScaleMin) {
+    scaleX = kScaleMin;
+  }
+  if (scaleY > kScaleMax) {
+    scaleY = kScaleMax;
+  } else if (scaleY < kScaleMin) {
+    scaleY = kScaleMin;
+  }
+  if (scaleZ > kScaleMax) {
+    scaleZ = kScaleMax;
+  } else if (scaleZ < kScaleMin) {
+    scaleZ = kScaleMin;
+  }
 }
 
 void resize_window(GLFWwindow *window) {
@@ -175,10 +215,8 @@ void draw(GLFWwindow *window) {
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
 
-  GLdouble field_of_view = kPerspectiveFieldOfViewAngle;
-  GLdouble near = kPerspectiveNearZ;
-  GLdouble far = kPerspectiveFarZ;
-  gluPerspective(field_of_view, aspect_ratio, near, far);
+  gluPerspective(kPerspectiveFieldOfViewAngle, aspect_ratio, kPerspectiveNearZ,
+                 kPerspectiveFarZ);
 
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
@@ -311,7 +349,6 @@ int main() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     keyboard_read(window);
-    updateTransformations();
     update_hud();
     resize_window(window);
     draw(window);
@@ -326,56 +363,6 @@ int main() {
   return EXIT_SUCCESS;
 }
 
-bool combinationKeys(GLFWwindow *window, int modifierKey, int mainKey) {
-  return (glfwGetKey(window, modifierKey) == GLFW_PRESS &&
-          glfwGetKey(window, mainKey) == GLFW_PRESS);
-}
-
-int direction(bool positive, bool negative) {
-  return static_cast<int>(positive) - static_cast<int>(negative);
-}
-
-void updateLimited(GLfloat &value, bool increase, bool decrease,
-                   GLfloat increment, GLfloat minimum, GLfloat maximum) {
-  value += direction(increase, decrease) * increment;
-
-  if (value > maximum) {
-    value = maximum;
-  } else if (value < minimum) {
-    value = minimum;
-  }
-}
-
-void updateRotation(GLfloat &angle, bool positive, bool negative) {
-  angle += direction(positive, negative) * rotate_angle_increment;
-
-  if (angle >= kRotateAngleLimit || angle <= -kRotateAngleLimit) {
-    angle = 0;
-  }
-}
-
-void updateTransformations() {
-  // Translação nos eixos X, Y e Z.
-  updateLimited(translate, translatingR, translatingL, translate_increment,
-                -kTranslateLimit, kTranslateLimit);
-  updateLimited(translateY, translatingU, translatingD, translate_increment,
-                -kTranslateLimit, kTranslateLimit);
-  updateLimited(translateZ, translatingNear, translatingFar,
-                translate_increment, -kTranslateLimit, kTranslateLimit);
-
-  // Rotação nos eixos X, Y e Z.
-  updateRotation(rotate_angle, rotatingU, rotatingD);
-  updateRotation(rotate_angleY, rotatingL, rotatingR);
-  updateRotation(rotate_angleZ, rotatingAntiClockwise, rotatingClockwise);
-
-  // Escala nos eixos X, Y e Z.
-  updateLimited(scaleX, scalingR, scalingL, scale_increment, kScaleMin,
-                kScaleMax);
-  updateLimited(scaleY, scalingU, scalingD, scale_increment, kScaleMin,
-                kScaleMax);
-  updateLimited(scaleZ, scalingNear, scalingFar, scale_increment, kScaleMin,
-                kScaleMax);
-}
 /*
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⡤⠤⣄⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⡾⠉⠀⠀⠀⠀⠈⠙⠲⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
