@@ -1,0 +1,470 @@
+/*
+ * *********************************************************************
+ * File: cubeWithHudAndHandClocks.cpp
+ * Author: Bruno Hemann
+ * Date: 26/08/2026
+ * Description: Um cubo 3D com transformações, HUD e ponteiros
+ * *********************************************************************
+ */
+
+#include <GL/glew.h>
+#include <GL/glu.h>
+#include <GLFW/glfw3.h>
+#include <iostream>
+#include <sstream>
+
+#include "font.h"
+const int kWindowWidth = 800;
+const int kWindowHeight = 800;
+
+const GLfloat kPerspectiveFieldOfViewAngle = 45;
+const GLfloat kPerspectiveNearZ = 0.1f;
+const GLfloat kPerspectiveFarZ = 100;
+const GLfloat kPerspectiveTranslateZ = 10;
+
+bool orthographic_view = true;
+const GLfloat kOrthographicLimitX = 6;
+const GLfloat kOrthographicLimitY = 6;
+const GLfloat kOrthographicLimitZ = 20;
+
+bool reset_pressed = false;
+
+bool translating = false;
+bool translatingL = false;
+bool translatingR = false;
+bool translatingU = false;
+bool translatingD = false;
+bool translatingNear = false;
+bool translatingFar = false;
+const GLfloat kTranslateLimit = 3;
+const GLfloat kDefaultTranslate = 0;
+GLfloat translate_increment = 0.1f;
+GLfloat translate = kDefaultTranslate;
+GLfloat translateY = kDefaultTranslate;
+GLfloat translateZ = kDefaultTranslate;
+
+bool rotating = false;
+bool rotatingU = false;
+bool rotatingD = false;
+bool rotatingL = false;
+bool rotatingR = false;
+bool rotatingAntiClockwise = false;
+bool rotatingClockwise = false;
+const GLfloat kRotateAngleLimit = 360;
+const GLfloat kDefaultRotateAngle = 0;
+GLfloat rotate_angle_increment = 1.0f;
+GLfloat rotate_angle = kDefaultRotateAngle;
+GLfloat rotate_angleY = kDefaultRotateAngle;
+GLfloat rotate_angleZ = kDefaultRotateAngle;
+
+bool scaling = false;
+bool scalingL = false;
+bool scalingR = false;
+bool scalingU = false;
+bool scalingD = false;
+bool scalingNear = false;
+bool scalingFar = false;
+const GLfloat kScaleMin = 0.1f;
+const GLfloat kScaleMax = 5.0f;
+const GLfloat kDefaultScale = 1.0f;
+GLfloat scale_increment = 0.1f;
+GLfloat scaleX = kDefaultScale;
+GLfloat scaleY = kDefaultScale;
+GLfloat scaleZ = kDefaultScale;
+
+GLfloat clock_hand_rotate_angle = 0;
+
+const GLfloat kHudHeight = 300;
+const GLfloat kHudWidth = 300;
+std::ostringstream hud_text;
+
+/*! @brief Função para verificar se uma combinação de teclas está sendo
+ * pressionada.
+ * @param window Ponteiro para a janela GLFW.
+ * @param modifierKey Tecla modificadora (ex: GLFW_KEY_T, GLFW_KEY_R,
+ * GLFW_KEY_E).
+ * @param mainKey Tecla principal (ex: GLFW_KEY_LEFT, GLFW_KEY_RIGHT,
+ * GLFW_KEY_UP, GLFW_KEY_DOWN, GLFW_KEY_PAGE_UP, GLFW_KEY_PAGE_DOWN).
+ */
+bool combinationKeys(GLFWwindow *window, int modifierKey, int mainKey);
+
+/*! @brief Converte duas direções opostas em um valor entre -1 e 1. */
+int direction(bool positive, bool negative);
+
+/*! @brief Atualiza um valor, mantendo-o dentro dos limites informados. */
+void updateLimited(GLfloat &value, bool increase, bool decrease,
+                   GLfloat increment, GLfloat minimum, GLfloat maximum);
+
+/*! @brief Atualiza um ângulo e o normaliza ao completar uma volta. */
+void updateRotation(GLfloat &angle, bool positive, bool negative);
+
+/*! @brief Atualiza os valores de translação, rotação e escala. */
+void updateTransformations();
+
+void keyboard_read(GLFWwindow *window) {
+  // Só pra mostrar no HUD qual modificação está sendo feita...
+  translating = combinationKeys(window, GLFW_KEY_T, GLFW_KEY_T);
+  rotating = combinationKeys(window, GLFW_KEY_R, GLFW_KEY_R);
+  scaling = combinationKeys(window, GLFW_KEY_E, GLFW_KEY_E);
+
+  if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+    glfwSetWindowShouldClose(window, true);
+  }
+
+  if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+    reset_pressed = true;
+    translate = kDefaultTranslate;
+    translateY = kDefaultTranslate;
+    translateZ = kDefaultTranslate;
+    rotate_angle = kDefaultRotateAngle;
+    rotate_angleY = kDefaultRotateAngle;
+    rotate_angleZ = kDefaultRotateAngle;
+    scaleX = kDefaultScale;
+    scaleY = kDefaultScale;
+    scaleZ = kDefaultScale;
+  }
+
+  translatingL = combinationKeys(window, GLFW_KEY_T, GLFW_KEY_LEFT);
+  translatingR = combinationKeys(window, GLFW_KEY_T, GLFW_KEY_RIGHT);
+  translatingU = combinationKeys(window, GLFW_KEY_T, GLFW_KEY_UP);
+  translatingD = combinationKeys(window, GLFW_KEY_T, GLFW_KEY_DOWN);
+  translatingNear = combinationKeys(window, GLFW_KEY_T, GLFW_KEY_PAGE_DOWN);
+  translatingFar = combinationKeys(window, GLFW_KEY_T, GLFW_KEY_PAGE_UP);
+
+  rotatingU = combinationKeys(window, GLFW_KEY_R, GLFW_KEY_UP);
+  rotatingD = combinationKeys(window, GLFW_KEY_R, GLFW_KEY_DOWN);
+  rotatingL = combinationKeys(window, GLFW_KEY_R, GLFW_KEY_LEFT);
+  rotatingR = combinationKeys(window, GLFW_KEY_R, GLFW_KEY_RIGHT);
+  rotatingAntiClockwise = combinationKeys(window, GLFW_KEY_R, GLFW_KEY_PAGE_UP);
+  rotatingClockwise = combinationKeys(window, GLFW_KEY_R, GLFW_KEY_PAGE_DOWN);
+
+  scalingL = combinationKeys(window, GLFW_KEY_E, GLFW_KEY_LEFT);
+  scalingR = combinationKeys(window, GLFW_KEY_E, GLFW_KEY_RIGHT);
+  scalingU = combinationKeys(window, GLFW_KEY_E, GLFW_KEY_UP);
+  scalingD = combinationKeys(window, GLFW_KEY_E, GLFW_KEY_DOWN);
+  scalingNear = combinationKeys(window, GLFW_KEY_E, GLFW_KEY_PAGE_DOWN);
+  scalingFar = combinationKeys(window, GLFW_KEY_E, GLFW_KEY_PAGE_UP);
+}
+
+void resize_window(GLFWwindow *window) {
+  int window_width, window_height;
+  glfwGetFramebufferSize(window, &window_width, &window_height);
+  glViewport(0, 0, window_width, window_height);
+}
+/*! @brief Atualiza o texto do HUD dado o estado atual... */
+void update_hud() {
+  hud_text.str("");
+
+  if (translating) {
+    hud_text << "Transladando (" << translate << ", " << translateY << ", "
+             << translateZ << ")";
+  } else if (rotating) {
+    hud_text << "Rotacionando (" << rotate_angle << ", " << rotate_angleY
+             << ", " << rotate_angleZ << ")";
+  } else if (scaling) {
+    hud_text << "Escalando (" << scaleX << ", " << scaleY << ", " << scaleZ
+             << ")";
+  } else if (reset_pressed) {
+    hud_text << "Redefinido!";
+    reset_pressed = false;
+  }
+}
+
+/*! @brief Desenha os dois ponteiros no plano XY local da face atual. */
+void draw_clock_hands() {
+  glPushMatrix();
+  {
+    glLineWidth(5);
+    glColor3ub(122, 228, 255);
+
+    glRotatef(clock_hand_rotate_angle, 0, 0, 1);
+    glBegin(GL_LINES);
+    {
+      glVertex3f(0, 0, 0.01f);
+      glVertex3f(0.25f, 0, 0.01f);
+    }
+    glEnd();
+
+    glRotatef(2 * clock_hand_rotate_angle, 0, 0, 1);
+    glBegin(GL_LINES);
+    {
+      glVertex3f(0, 0, 0.01f);
+      glVertex3f(0.5f, 0, 0.01f);
+    }
+    glEnd();
+  }
+  glPopMatrix();
+}
+
+void draw(GLFWwindow *window) {
+  int window_width, window_height;
+  glfwGetFramebufferSize(window, &window_width, &window_height);
+  GLdouble aspect_ratio = (GLdouble)window_width / window_height;
+
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity();
+
+  GLdouble field_of_view = kPerspectiveFieldOfViewAngle;
+  GLdouble near = kPerspectiveNearZ;
+  GLdouble far = kPerspectiveFarZ;
+  gluPerspective(field_of_view, aspect_ratio, near, far);
+
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
+
+  glTranslatef(translate, translateY, -kPerspectiveTranslateZ + translateZ);
+  glRotatef(rotate_angle, 1, 0, 0);
+  glRotatef(rotate_angleY, 0, 1, 0);
+  glRotatef(rotate_angleZ, 0, 0, 1);
+  glScalef(scaleX, scaleY, scaleZ);
+
+  glBegin(GL_QUADS);
+  {
+    // Face frontal (Z positivo).
+    glColor3ub(190, 195, 209);
+    glVertex3f(-1, -1, 1);
+    glVertex3f(1, -1, 1);
+    glVertex3f(1, 1, 1);
+    glVertex3f(-1, 1, 1);
+
+    // Face traseira (Z negativo).
+    glColor3ub(107, 29, 104);
+    glVertex3f(1, -1, -1);
+    glVertex3f(-1, -1, -1);
+    glVertex3f(-1, 1, -1);
+    glVertex3f(1, 1, -1);
+
+    // Face esquerda (X negativo).
+    glColor3ub(29, 91, 107);
+    glVertex3f(-1, -1, -1);
+    glVertex3f(-1, -1, 1);
+    glVertex3f(-1, 1, 1);
+    glVertex3f(-1, 1, -1);
+
+    // Face direita (X positivo).
+    glColor3ub(71, 98, 186);
+    glVertex3f(1, -1, 1);
+    glVertex3f(1, -1, -1);
+    glVertex3f(1, 1, -1);
+    glVertex3f(1, 1, 1);
+
+    // Face superior (Y positivo).
+    glColor3ub(255, 255, 0);
+    glVertex3f(-1, 1, -1);
+    glVertex3f(1, 1, -1);
+    glVertex3f(1, 1, 1);
+    glVertex3f(-1, 1, 1);
+
+    // Face inferior (Y negativo).
+    glColor3ub(255, 0, 255);
+    glVertex3f(-1, -1, -1);
+    glVertex3f(1, -1, -1);
+    glVertex3f(1, -1, 1);
+    glVertex3f(-1, -1, 1);
+  }
+  glEnd();
+
+  // Face frontal (Z positivo).
+  glPushMatrix();
+  {
+    glTranslatef(0, 0, 1);
+    draw_clock_hands();
+  }
+  glPopMatrix();
+
+  // Face traseira (Z negativo).
+  glPushMatrix();
+  {
+    glTranslatef(0, 0, -1);
+    glRotatef(180, 0, 1, 0);
+    draw_clock_hands();
+  }
+  glPopMatrix();
+
+  // Face esquerda (X negativo).
+  glPushMatrix();
+  {
+    glTranslatef(-1, 0, 0);
+    glRotatef(-90, 0, 1, 0);
+    draw_clock_hands();
+  }
+  glPopMatrix();
+
+  // Face direita (X positivo).
+  glPushMatrix();
+  {
+    glTranslatef(1, 0, 0);
+    glRotatef(90, 0, 1, 0);
+    draw_clock_hands();
+  }
+  glPopMatrix();
+
+  clock_hand_rotate_angle--;
+}
+
+void draw_hud(GLFWwindow *window) {
+  int window_width, window_height;
+  glfwGetFramebufferSize(window, &window_width, &window_height);
+  GLdouble aspect_ratio = (GLdouble)window_width / window_height;
+
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity();
+  GLdouble left = 0;
+  GLdouble right = kHudWidth;
+  GLdouble bottom = 0;
+  GLdouble top = kHudHeight;
+  if (window_width > window_height) {
+    gluOrtho2D((left * aspect_ratio), (right * aspect_ratio), bottom, top);
+  } else {
+    gluOrtho2D(left, right, (bottom / aspect_ratio), (top / aspect_ratio));
+  }
+
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
+  glDisable(GL_DEPTH_TEST);
+  {
+    glColor3ub(255, 255, 255);
+    draw_text(5, 5, hud_text.str());
+
+    glPointSize(20);
+    glBegin(GL_POINTS);
+    {
+      if (translating) {
+        glColor3ub(255, 0, 0);
+        glVertex2f(7.5, 20);
+      }
+
+      if (rotating) {
+        glColor3ub(0, 255, 0);
+        glVertex2f(17.5, 20);
+      }
+
+      if (scaling) {
+        glColor3ub(0, 0, 255);
+        glVertex2f(27.5, 20);
+      }
+    }
+    glEnd();
+  }
+  glEnable(GL_DEPTH_TEST);
+}
+
+int main() {
+  if (!glfwInit()) {
+    std::cerr << "Falha ao inicializar GLFW" << std::endl;
+    return EXIT_FAILURE;
+  }
+
+  glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+  GLFWwindow *window =
+      glfwCreateWindow(kWindowWidth, kWindowHeight, "", NULL, NULL);
+  if (!window) {
+    std::cerr << "Falha ao criar a janela GLFW" << std::endl;
+    glfwTerminate();
+    return EXIT_FAILURE;
+  }
+  glfwSetWindowPos(window, 0, 0);
+  glfwMakeContextCurrent(window);
+
+  if (glewInit() != GLEW_OK) {
+    std::cerr << "Falha ao inicializar GLEW" << std::endl;
+    return EXIT_FAILURE;
+  }
+
+  glEnable(GL_DEPTH_TEST);
+
+  while (!glfwWindowShouldClose(window)) {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    keyboard_read(window);
+    updateTransformations();
+    update_hud();
+    resize_window(window);
+    draw(window);
+    draw_hud(window);
+
+    glfwSwapBuffers(window);
+    glfwPollEvents();
+  }
+
+  glfwDestroyWindow(window);
+  glfwTerminate();
+  return EXIT_SUCCESS;
+}
+
+bool combinationKeys(GLFWwindow *window, int modifierKey, int mainKey) {
+  return (glfwGetKey(window, modifierKey) == GLFW_PRESS &&
+          glfwGetKey(window, mainKey) == GLFW_PRESS);
+}
+
+int direction(bool positive, bool negative) {
+  return static_cast<int>(positive) - static_cast<int>(negative);
+}
+
+void updateLimited(GLfloat &value, bool increase, bool decrease,
+                   GLfloat increment, GLfloat minimum, GLfloat maximum) {
+  value += direction(increase, decrease) * increment;
+
+  if (value > maximum) {
+    value = maximum;
+  } else if (value < minimum) {
+    value = minimum;
+  }
+}
+
+void updateRotation(GLfloat &angle, bool positive, bool negative) {
+  angle += direction(positive, negative) * rotate_angle_increment;
+
+  if (angle >= kRotateAngleLimit || angle <= -kRotateAngleLimit) {
+    angle = 0;
+  }
+}
+
+void updateTransformations() {
+  // Translação nos eixos X, Y e Z.
+  updateLimited(translate, translatingR, translatingL, translate_increment,
+                -kTranslateLimit, kTranslateLimit);
+  updateLimited(translateY, translatingU, translatingD, translate_increment,
+                -kTranslateLimit, kTranslateLimit);
+  updateLimited(translateZ, translatingNear, translatingFar,
+                translate_increment, -kTranslateLimit, kTranslateLimit);
+
+  // Rotação nos eixos X, Y e Z.
+  updateRotation(rotate_angle, rotatingU, rotatingD);
+  updateRotation(rotate_angleY, rotatingL, rotatingR);
+  updateRotation(rotate_angleZ, rotatingAntiClockwise, rotatingClockwise);
+
+  // Escala nos eixos X, Y e Z.
+  updateLimited(scaleX, scalingR, scalingL, scale_increment, kScaleMin,
+                kScaleMax);
+  updateLimited(scaleY, scalingU, scalingD, scale_increment, kScaleMin,
+                kScaleMax);
+  updateLimited(scaleZ, scalingNear, scalingFar, scale_increment, kScaleMin,
+                kScaleMax);
+}
+/*
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⡤⠤⣄⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⡾⠉⠀⠀⠀⠀⠈⠙⠲⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⠋⠀⠀⠀⣀⠀⠀⣠⠀⢀⠘⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⠛⠁⠀⠀⠀⠙⣳⣶⣿⣫⣤⣼⣖⡏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣿⠏⠀⠢⢄⡴⣣⣾⠋⠻⣿⡾⣿⣿⣿⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢿⣴⡏⡴⠋⣴⡿⠻⠀⠀⢠⣴⡯⣹⢸⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⡤⠶⠒⠒⠲⠦⣄⣀⣀⣀⡽⠻⣧⣸⡿⣇⠀⢰⣾⣯⡿⢨⠏⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠾⠃⠀⠀⠀⠀⠀⠀⠀⠑⠦⣌⠛⠦⣆⠋⠁⠘⢷⣄⠺⢿⣷⣻⣾⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⢀⡴⠞⠋⠉⣩⣉⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠛⣦⡈⠓⢿⡮⣴⣼⢿⣿⢻⣄⠙⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⣀⡤⠴⠤⣼⢛⡁⣠⣴⠟⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢻⣆⠀⠙⢦⡀⢪⡉⠉⠛⣿⠲⢤⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⢠⡞⠉⠀⠀⠀⠀⠀⠹⣟⡁⠀⠀⠀⠀⠀⢀⡴⣲⣲⣦⠀⠀⠀⠀⠀⠀⠀⠀⢹⡆⠀⠀⣿⣶⣿⣶⣲⣃⠀⢸⠙⣦⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⡴⠟⠀⠀⠀⠀⠀⣠⣞⣻⣫⠷⡶⡲⡖⢲⣶⣟⣰⣿⡋⠙⣷⣦⣄⠀⢠⠴⠲⣄⠈⡇⢸⣷⣌⡻⣿⣿⡿⢁⣼⡎⡇⠰⣌⠹⣆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⢷⣿⣶⠦⠤⠤⢤⡿⠓⡆⡿⡇⢹⡀⢳⠀⣇⢻⡿⢮⢷⢀⡀⠈⠉⠉⠉⠀⢀⠛⠦⣿⢸⣿⣿⣿⣿⣿⣿⣿⣿⣷⡇⠃⠘⣧⠹⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠈⠻⣷⣀⠀⣈⣿⣞⣡⡷⢷⣿⣾⣿⣶⣏⣾⣹⢈⣿⣴⣉⣉⠒⠒⠒⠉⠉⠙⠲⢤⣉⠛⠻⠯⣿⣿⣯⡙⢿⡏⣿⠀⠀⢸⠀⢹⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠉⠙⠛⠛⠛⠛⠛⠛⠛⢫⣟⣿⣿⠿⢥⣾⠏⢷⣲⣢⣒⣛⢭⡀⠒⠒⠢⠤⠬⢭⣒⡦⣄⡈⠉⠉⠓⠓⠿⠤⣤⣏⣐⣾⠁⠀⠀⠀⠀⠀⢀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠉⠀⠀⠀⣏⣀⣴⠒⠚⡟⠽⡗⠊⢳⠒⠛⠉⠉⠉⢉⣉⣉⣉⠉⠙⠒⠒⠀⠤⠤⠤⣌⣉⡉⠛⠒⠒⠦⠴⢿⡋⣿⢹⣲⣤⡀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠹⣦⡀⠀⠘⣦⣷⣄⡴⠚⢛⣿⣿⡋⠉⠉⠉⣩⠏⠉⠹⣿⠛⢲⣶⠶⠤⠤⢤⣈⣉⣑⣒⡶⠞⣟⣛⣲⣇⣇⣟⠒⠒⠦⢤⣀⡀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢿⣴⣾⠟⣻⠦⣤⣴⣿⡟⠋⠉⠉⠉⠙⢹⡗⠒⠒⣿⡇⣸⢧⡀⠀⢀⡼⠀⠀⠈⡿⠀⠘⢻⡿⢿⣿⠟⠥⠭⠭⣽⣒⣲⣭⠷
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⣿⣱⣾⠿⠛⣡⠖⢻⣧⣀⣀⣀⣀⣀⣸⠇⠀⢀⣿⣷⠟⣷⡽⠷⠿⣅⡤⡖⣿⣡⣤⣤⣼⢀⣀⡼⠁⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢿⠃⣀⡀⡇⠀⠈⢿⠉⠀⠀⠈⠉⢹⡟⠒⣞⣽⠟⢰⡏⠀⠀⢀⡟⡉⢀⣽⣷⣧⣼⡿⠋⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⢣⣇⣻⣿⣀⣀⣸⣆⣀⣀⣀⡀⣸⠃⠀⣸⣿⣀⡲⣷⣄⣀⣀⣷⣾⣿⣿⣿⣿⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠰⣿⣿⠿⠟⠛⠛⠛⠛⠛⡓⠛⠿⠿⠿⣽⣖⣷⣧⠙⢿⡛⠯⠍⠭⠵⠛⣛⡾⠛⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣿⣿⣶⣾⣿⣿⣶⣶⣶⣤⣄⣀⡀⠀⠀⠂⣹⡏⠀⠈⠻⠷⠤⠤⠴⠞⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠰⠟⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠚⠛⠛⠛⠛⠛⠿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+Hemann*/
