@@ -135,8 +135,7 @@ void keyboard_read(GLFWwindow *window) {
     }
   }
 
-  if (rotate_angle >= kRotateAngleLimit ||
-      rotate_angle <= -kRotateAngleLimit) {
+  if (rotate_angle >= kRotateAngleLimit || rotate_angle <= -kRotateAngleLimit) {
     rotate_angle = kDefaultRotateAngle;
   }
   if (rotate_angleY >= kRotateAngleLimit ||
@@ -302,41 +301,15 @@ void draw(GLFWwindow *window) {
   }
   glEnd();
 
-  // Face frontal (Z positivo).
-  glPushMatrix();
-  {
-    glTranslatef(0, 0, 1);
-    draw_clock_hands();
+  for (int face = 0; face < 4; ++face) {
+    glPushMatrix();
+    {
+      glRotatef(face * 90.0f, 0, 1, 0);
+      glTranslatef(0, 0, 1);
+      draw_clock_hands();
+    }
+    glPopMatrix();
   }
-  glPopMatrix();
-
-  // Face traseira (Z negativo).
-  glPushMatrix();
-  {
-    glTranslatef(0, 0, -1);
-    glRotatef(180, 0, 1, 0);
-    draw_clock_hands();
-  }
-  glPopMatrix();
-
-  // Face esquerda (X negativo).
-  glPushMatrix();
-  {
-    glTranslatef(-1, 0, 0);
-    glRotatef(-90, 0, 1, 0);
-    draw_clock_hands();
-  }
-  glPopMatrix();
-
-  // Face direita (X positivo).
-  glPushMatrix();
-  {
-    glTranslatef(1, 0, 0);
-    glRotatef(90, 0, 1, 0);
-    draw_clock_hands();
-  }
-  glPopMatrix();
-
   clock_hand_rotate_angle--;
 }
 
