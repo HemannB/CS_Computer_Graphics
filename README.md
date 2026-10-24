@@ -3,7 +3,7 @@
 Repositório de exercícios da disciplina de Computação Gráfica. Os exemplos
 apresentam de forma progressiva a criação de janelas, o desenho de formas 2D e
 3D, transformações geométricas, projeções, HUDs, texturas e movimentação de
-câmera usando C++ e OpenGL.
+câmera, carregamento de modelos GLB e iluminação usando C++ e OpenGL.
 
 ## Conteúdos estudados
 
@@ -15,7 +15,11 @@ câmera usando C++ e OpenGL.
 - buffer de profundidade;
 - renderização de texto e informações em HUD;
 - carregamento e aplicação de texturas com `stb_image`;
-- câmera em primeira pessoa controlada pelo teclado e mouse.
+- câmera em primeira pessoa controlada pelo teclado e mouse;
+- importação de modelos GLB com Assimp;
+- otimização de modelos com Display Lists;
+- composição de cenas com múltiplos modelos e skybox;
+- iluminação ambiente, difusa, especular e emissiva com múltiplas luzes.
 
 Os exercícios usam o pipeline fixo do OpenGL, com funções como `glBegin`,
 `glVertex` e `glColor`. Essa abordagem tem finalidade didática e permite
@@ -33,9 +37,13 @@ pipeline moderno.
 | `Lesson06_August_26` | Cubo com HUD e ponteiros de relógio |
 | `Lesson07_September_02` | Aplicação de texturas ao cubo e ao cenário |
 | `Lesson08_September_09` | Movimentação de câmera com teclado e mouse |
+| `Lesson09_September_23` | Modelo GLB com HUD, transformações e câmera livre |
+| `Lesson10_Semptember_30` | Renderização otimizada de modelo GLB com Display List |
+| `Lesson11_October_07` | Cena de batalha em Tatooine com modelos e skybox |
+| `Lesson12_October_14` | Iluminação da cena, dois sóis e controle da fonte de luz |
 
-Cada diretório contém um exercício independente. As lessons que usam texturas
-também incluem os recursos necessários em uma pasta `textures`.
+Cada diretório contém um exercício independente. Os recursos necessários ficam
+nas pastas `textures`, `models` e `skybox` da respectiva lesson.
 
 ## Dependências
 
@@ -43,13 +51,14 @@ também incluem os recursos necessários em uma pasta `textures`.
 - OpenGL;
 - GLEW;
 - GLFW;
-- GLU.
+- GLU;
+- Assimp, para os exemplos com modelos GLB.
 
 Em distribuições baseadas em Ubuntu, instale as dependências com:
 
 ```bash
 sudo apt update
-sudo apt install g++ libglew-dev libglfw3-dev libglu1-mesa-dev
+sudo apt install g++ libglew-dev libglfw3-dev libglu1-mesa-dev libassimp-dev
 ```
 
 ## Compilação
@@ -76,11 +85,22 @@ g++ -std=c++17 cubeWithHudAndTextureAndMoviment.cpp \
 ../build/lesson08
 ```
 
+As Lessons 09 a 12 também precisam ser vinculadas ao Assimp. Para compilar a
+cena iluminada mais recente:
+
+```bash
+cd Lesson12_October_14
+mkdir -p ../build
+g++ -std=c++17 main.cpp -o ../build/lesson12 \
+  -lGLEW -lglfw -lGL -lGLU -lassimp
+../build/lesson12
+```
+
 ## Controles
 
 ### Transformações do objeto
 
-Estes controles são usados nos exemplos interativos das Lessons 04 a 08:
+Estes controles são usados nos exemplos interativos das Lessons 04 a 10:
 
 | Teclas | Função |
 |---|---|
@@ -96,17 +116,25 @@ Estes controles são usados nos exemplos interativos das Lessons 04 a 08:
 Na Lesson 04, `O` seleciona a projeção ortográfica e `P` seleciona a projeção
 em perspectiva.
 
-### Câmera da Lesson 08
+### Câmera das Lessons 08 a 12
 
 | Entrada | Função |
 |---|---|
 | `W` / `S` | Move a câmera para frente ou para trás |
 | `A` / `D` | Move a câmera lateralmente |
 | Movimento do mouse | Altera a direção da câmera |
+| `Espaço` | Restaura a câmera e os elementos controláveis |
+
+### Iluminação da Lesson 12
+
+| Teclas | Função |
+|---|---|
+| `K` + setas | Move o sol principal nos eixos X e Y |
+| `K` + Page Up/Down | Move o sol principal no eixo Z |
 
 ## Propósito
 
 O projeto registra a evolução prática dos conteúdos da disciplina. Cada aula
 acrescenta conceitos sobre a base dos exercícios anteriores e permite observar
-como coordenadas, matrizes, projeções, profundidade, texturas e câmera afetam a
-cena renderizada.
+como coordenadas, matrizes, projeções, profundidade, texturas, câmera, modelos e
+fontes de luz afetam a cena renderizada.
